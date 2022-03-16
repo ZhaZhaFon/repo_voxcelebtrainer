@@ -16,7 +16,7 @@ from tqdm import tqdm
 from scipy.io import wavfile
 
 ## ========== ===========
-## Parse input arguments
+## Parse input arguments 参数解析
 ## ========== ===========
 parser = argparse.ArgumentParser(description = "VoxCeleb downloader");
 

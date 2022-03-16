@@ -1,11 +1,32 @@
-# VoxCeleb trainer
+
+# voxcelebtrainer_repo
 
 This repository contains the framework for training speaker recognition models described in the paper '_In defence of metric learning for speaker recognition_'.
 
-### Dependencies
+
+该代码出自论文[1], 用于实验不同的深度度量学习方法训练xvector用于说话人识别的效果. 在[原项目](https://github.com/clovaai/voxceleb_trainer)的基础上, 做了一些配置方便使用, 并加入了一些注释.
+
+### Dependencies 环境配置
+运行以下命令一键配置环境
 ```
 pip install -r requirements.txt
 ```
+
+### 文件组织
+
+```
+voxceleb_trainer/ 
+    models/ 各网络结构
+    loss/ 各损失函数
+    DatasetLoader.py 数据集IO
+    SpeakerNet.py 网络结构
+    trainSpeakerNet.py 训练主程序
+```
+
+### TODO LIST
+* 通过yaml配置参数
+* 跑完整个train生命周期
+* eval部分
 
 ### Data preparation
 

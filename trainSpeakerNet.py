@@ -1,6 +1,10 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
 
+# original codebase: https://github.com/clovaai/voxceleb_trainer
+# edited and distributed by Zifeng Zhao @ Peking University
+# 2022.03
+
 import sys, time, os, argparse, socket
 import yaml
 import numpy
@@ -10,14 +14,14 @@ import glob
 import zipfile
 import warnings
 import datetime
+import SpeakerNet
 from tuneThreshold import *
-from SpeakerNet import *
-from DatasetLoader import *
+import DatasetLoader
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
 ## ===== ===== ===== ===== ===== ===== ===== =====
-## Parse arguments
+## Parse arguments 运行参数解析
 ## ===== ===== ===== ===== ===== ===== ===== =====
 
 parser = argparse.ArgumentParser(description = "SpeakerNet");
@@ -62,11 +66,11 @@ parser.add_argument('--dcf_c_fa',       type=float, default=1,      help='Cost o
 parser.add_argument('--initial_model',  type=str,   default="",     help='Initial model weights');
 parser.add_argument('--save_path',      type=str,   default="exps/exp1", help='Path for model and logs');
 
-## Training and test data
-parser.add_argument('--train_list',     type=str,   default="data/train_list.txt",  help='Train list');
-parser.add_argument('--test_list',      type=str,   default="data/test_list.txt",   help='Evaluation list');
-parser.add_argument('--train_path',     type=str,   default="data/voxceleb2", help='Absolute path to the train set');
-parser.add_argument('--test_path',      type=str,   default="data/voxceleb1", help='Absolute path to the test set');
+## Training and test data 数据地址
+parser.add_argument('--train_list',     type=str,   default="data/train_list.txt",  help='Train list'); # 训练集的train_list.txt列表
+parser.add_argument('--test_list',      type=str,   default="data/test_list.txt",   help='Evaluation list'); # 测试集的test_list.txt列表
+parser.add_argument('--train_path',     type=str,   default="data/voxceleb2", help='Absolute path to the train set'); # 训练集绝对路径
+parser.add_argument('--test_path',      type=str,   default="data/voxceleb1", help='Absolute path to the test set'); # 测试集绝对路径
 parser.add_argument('--musan_path',     type=str,   default="data/musan_split", help='Absolute path to the test set');
 parser.add_argument('--rir_path',       type=str,   default="data/RIRS_NOISES/simulated_rirs", help='Absolute path to the test set');
 
@@ -85,16 +89,20 @@ parser.add_argument('--port',           type=str,   default="8888", help='Port f
 parser.add_argument('--distributed',    dest='distributed', action='store_true', help='Enable distributed training')
 parser.add_argument('--mixedprec',      dest='mixedprec',   action='store_true', help='Enable mixed precision training')
 
+# 新增参数
+parser.add_argument("--gpu",            type=str,    default="0",    required=True, help="GPU available")
+
+print('# 解析parser运行参数')
 args = parser.parse_args();
 
-## Parse YAML
+## Parse YAML 可在config参数项中传入yaml配置文件(或者接使用args运行参数)
 def find_option_type(key, parser):
     for opt in parser._get_optional_actions():
         if ('--' + key) in opt.option_strings:
            return opt.type
     raise ValueError
-
 if args.config is not None:
+    print('# 解析yaml配置文件')
     with open(args.config, "r") as f:
         yml_config = yaml.load(f, Loader=yaml.FullLoader)
     for k, v in yml_config.items():
@@ -103,7 +111,6 @@ if args.config is not None:
             args.__dict__[k] = typ(v)
         else:
             sys.stderr.write("Ignored unknown parameter {} in yaml.\n".format(k))
-
 
 ## Try to import NSML
 try:
@@ -116,15 +123,18 @@ except:
 warnings.simplefilter("ignore")
 
 ## ===== ===== ===== ===== ===== ===== ===== =====
-## Trainer script
+## Trainer script 训练主进程
 ## ===== ===== ===== ===== ===== ===== ===== =====
 
 def main_worker(gpu, ngpus_per_node, args):
-
+    
+    print('# 进入主进程...')
+    
     args.gpu = gpu
 
     ## Load models
-    s = SpeakerNet(**vars(args));
+    print('   # 加载网络结构')
+    model = SpeakerNet.SpeakerNet(**vars(args));
 
     if args.distributed:
         os.environ['MASTER_ADDR']='localhost'
@@ -133,56 +143,67 @@ def main_worker(gpu, ngpus_per_node, args):
         dist.init_process_group(backend='nccl', world_size=ngpus_per_node, rank=args.gpu)
 
         torch.cuda.set_device(args.gpu)
-        s.cuda(args.gpu)
+        model.cuda(args.gpu)
 
-        s = torch.nn.parallel.DistributedDataParallel(s, device_ids=[args.gpu], find_unused_parameters=True)
+        model = torch.nn.parallel.DistributedDataParallel(s, device_ids=[args.gpu], find_unused_parameters=True)
 
         print('Loaded the model on GPU {:d}'.format(args.gpu))
 
     else:
-        s = WrappedModel(s).cuda(args.gpu)
+        torch.cuda.set_device(args.gpu)
+        model = SpeakerNet.WrappedModel(model).cuda(args.gpu)
 
     it = 1
     eers = [100];
 
-    if args.gpu == 0:
+    #if args.gpu == 0:
+    if True:
         ## Write args to scorefile
         scorefile   = open(args.result_save_path+"/scores.txt", "a+");
 
     ## Initialise trainer and data loader
-    train_dataset = train_dataset_loader(**vars(args))
-
-    train_sampler = train_dataset_sampler(train_dataset, **vars(args))
-
+    print('   # 加载数据...')
+    print('      # 加载train_dataset')
+    train_dataset = DatasetLoader.train_dataset_loader(**vars(args))
+    print('      # 加载train_sampler')
+    train_sampler = DatasetLoader.train_dataset_sampler(train_dataset, **vars(args))
+    print('      # 加载train_loader')
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=args.batch_size,
         num_workers=args.nDataLoaderThread,
         sampler=train_sampler,
         pin_memory=False,
-        worker_init_fn=worker_init_fn,
+        worker_init_fn=DatasetLoader.worker_init_fn,
         drop_last=True,
     )
 
+    print('   # 加载SpeakerNet.ModelTrainer')
     # trainLoader = get_data_loader(args.train_list, **vars(args));
-    trainer     = ModelTrainer(s, **vars(args))
+    trainer     = SpeakerNet.ModelTrainer(model, **vars(args))
 
     ## Load model weights
+    print('   # 检索断点')
     modelfiles = glob.glob('%s/model0*.model'%args.model_save_path)
     modelfiles.sort()
 
     if(args.initial_model != ""):
+        print("      从给定的{}加载模型参数".format(args.initial_model));
         trainer.loadParameters(args.initial_model);
-        print("Model {} loaded!".format(args.initial_model));
+        #print("Model {} loaded!".format(args.initial_model));
     elif len(modelfiles) >= 1:
         trainer.loadParameters(modelfiles[-1]);
-        print("Model {} loaded from previous state!".format(modelfiles[-1]));
+        print("      从{}加载断点".format(modelfiles[-1]), end='');
+        #print("Model {} loaded from previous state!".format(modelfiles[-1]));
         it = int(os.path.splitext(os.path.basename(modelfiles[-1]))[0][5:]) + 1
+        print(" 从epoch{}继续".format(it))
+    else:
+        print("      从0起训");
 
     for ii in range(1,it):
         trainer.__scheduler__.step()
     
-    ## Evaluation code - must run on single GPU
+    ## Evaluation code - must run on single GPU 评估模式
     if args.eval == True:
 
         pytorch_total_params = sum(p.numel() for p in s.module.__S__.parameters())
@@ -212,9 +233,12 @@ def main_worker(gpu, ngpus_per_node, args):
                 nsml.report(**training_report);
 
         return
+    
+    # 训练模式
 
-    ## Save training code and params
-    if args.gpu == 0:
+    ## Save training code and params 备份训练程序和训练参数
+    #if args.gpu == 0:
+    if True:
         pyfiles = glob.glob('./*.py')
         strtime = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 
@@ -227,23 +251,30 @@ def main_worker(gpu, ngpus_per_node, args):
             f.write('%s'%args)
 
     ## Core training script
+    print('')
+    print('### START TRAINING ###')
     for it in range(it,args.max_epoch+1):
 
         train_sampler.set_epoch(it)
 
         clr = [x['lr'] for x in trainer.__optimizer__.param_groups]
 
-        loss, traineer = trainer.train_network(train_loader, verbose=(args.gpu == 0));
+        print(f'# epoch {it} - train...')
+        #loss, traineer = trainer.train_network(train_loader, verbose=(args.gpu == 0));
+        loss, traineer = trainer.train_network(train_loader, verbose=True);
 
-        if args.gpu == 0:
+        # if args.gpu == 0:
+        if True:
             print('\n',time.strftime("%Y-%m-%d %H:%M:%S"), "Epoch {:d}, TEER/TAcc {:2.2f}, TLOSS {:f}, LR {:f}".format(it, traineer, loss, max(clr)));
             scorefile.write("Epoch {:d}, TEER/TAcc {:2.2f}, TLOSS {:f}, LR {:f} \n".format(it, traineer, loss, max(clr)));
 
         if it % args.test_interval == 0:
 
+            print(f'# epoch {it} - test_interval...')
             sc, lab, _ = trainer.evaluateFromList(**vars(args))
 
-            if args.gpu == 0:
+            #if args.gpu == 0:
+            if True:
                 
                 result = tuneThresholdfromScore(sc, lab, [1, 0.1]);
 
@@ -272,12 +303,13 @@ def main_worker(gpu, ngpus_per_node, args):
 
             nsml.report(**training_report);
 
-    if args.gpu == 0:
+    #if args.gpu == 0:
+    if True:
         scorefile.close();
 
 
 ## ===== ===== ===== ===== ===== ===== ===== =====
-## Main function
+## Main function 主函数入口
 ## ===== ===== ===== ===== ===== ===== ===== =====
 
 
@@ -301,9 +333,11 @@ def main():
     print('Save path:',args.save_path)
 
     if args.distributed:
-        mp.spawn(main_worker, nprocs=n_gpus, args=(n_gpus, args))
+        mp.spawn(main_worker, nprocs=n_gpus, args=(n_gpus, args)) # 多卡
     else:
-        main_worker(0, None, args)
+        print('# 使用单GPU: {}'.format(args.gpu))
+        main_worker(int(args.gpu), None, args) # 单卡
+        #main_worker(0, None, args)
 
 
 if __name__ == '__main__':

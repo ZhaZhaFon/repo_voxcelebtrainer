@@ -74,7 +74,7 @@ class ModelTrainer(object):
         assert self.lr_step in ['epoch', 'iteration']
 
     # ## ===== ===== ===== ===== ===== ===== ===== =====
-    # ## Train network
+    # ## Train network 训练网络
     # ## ===== ===== ===== ===== ===== ===== ===== =====
 
     def train_network(self, loader, verbose):
@@ -131,7 +131,7 @@ class ModelTrainer(object):
 
 
     ## ===== ===== ===== ===== ===== ===== ===== =====
-    ## Evaluate from list
+    ## Evaluate from list 根据测试列表进行评估
     ## ===== ===== ===== ===== ===== ===== ===== =====
 
     def evaluateFromList(self, test_list, test_path, nDataLoaderThread, distributed, print_interval=100, num_eval=10, **kwargs):
@@ -246,7 +246,7 @@ class ModelTrainer(object):
 
 
     ## ===== ===== ===== ===== ===== ===== ===== =====
-    ## Load parameters
+    ## Load parameters 从模型文件中加载模型参数
     ## ===== ===== ===== ===== ===== ===== ===== =====
 
     def loadParameters(self, path):
