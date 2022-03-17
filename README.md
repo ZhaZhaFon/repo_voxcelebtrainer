@@ -21,7 +21,7 @@ voxceleb_trainer/
       ResNetSE34L.py
     loss/ 各损失函数
       softmax.py 
-    DatasetLoader.py 数据集IO
+    DatasetLoader.py 数据IO
     SpeakerNet.py 网络结构
     trainSpeakerNet.py 训练主程序
     tuneThreshold.py 卡阈值及指标计算相关
