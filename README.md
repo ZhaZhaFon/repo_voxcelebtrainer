@@ -33,9 +33,6 @@ voxceleb_trainer/
 
 trainSpeakerNet.py主程序中对象化SpeakerNet.ModelTrainer, 并通过其train_network方法进行单epoch训练. 对每批数据, 通过SpeakerNet.SpeakerNet模型的forward方法进行前向传播
 ```
-nloss, prec1 = self.__model__(data, label)
-```
-```
 def train_network(self, loader, verbose):
 
         self.__model__.train();
@@ -66,6 +63,7 @@ def train_network(self, loader, verbose):
             else:
                 # 前向传播
                 nloss, prec1 = self.__model__(data, label)
+                # 反向传播
                 nloss.backward();
                 self.__optimizer__.step();
 
@@ -153,8 +151,6 @@ class LossFunction(nn.Module):
 
 		return nloss, prec1
 ```
-
-* 
 
 ### TODO LIST
 * 通过yaml配置参数
