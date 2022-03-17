@@ -63,7 +63,7 @@ def train_network(self, loader, verbose):
                 self.scaler.step(self.__optimizer__);
                 self.scaler.update();       
             else:
-                # 
+                # 前向传播
                 nloss, prec1 = self.__model__(data, label)
                 nloss.backward();
                 self.__optimizer__.step();
