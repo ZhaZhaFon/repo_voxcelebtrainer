@@ -28,9 +28,11 @@ class SpeakerNet(nn.Module):
     def __init__(self, model, optimizer, trainfunc, nPerSpeaker, **kwargs):
         super(SpeakerNet, self).__init__();
 
+        # SpeakerEncoder模型
         SpeakerNetModel = importlib.import_module('models.'+model).__getattribute__('MainModel')
         self.__S__ = SpeakerNetModel(**kwargs);
 
+        # Loss函数
         LossFunction = importlib.import_module('loss.'+trainfunc).__getattribute__('LossFunction')
         self.__L__ = LossFunction(**kwargs);
 
@@ -38,6 +40,7 @@ class SpeakerNet(nn.Module):
 
     def forward(self, data, label=None):
 
+        # SpeakerEncoder子模型前向传播 得到SpeakerEmbedding
         data    = data.reshape(-1,data.size()[-1]).cuda() 
         outp    = self.__S__.forward(data)
 
@@ -47,7 +50,8 @@ class SpeakerNet(nn.Module):
         else:
 
             outp    = outp.reshape(self.nPerSpeaker,-1,outp.size()[-1]).transpose(1,0).squeeze(1)
-
+            
+            # SpeakerEmbedding送给Loss子模型计算loss和precision
             nloss, prec1 = self.__L__.forward(outp,label)
 
             return nloss, prec1
@@ -120,7 +124,7 @@ class ModelTrainer(object):
 
             if verbose:
                 sys.stdout.write("\rProcessing {:d} of {:d}:".format(index, loader.__len__()*loader.batch_size));
-                sys.stdout.write("Loss {:f} TEER/TAcc {:2.3f}% - {:.2f} Hz ".format(loss/counter, top1/counter, stepsize/telapsed));
+                sys.stdout.write("Loss {:f} TrainEER/TrainAcc {:2.3f}% - {:.2f} Hz ".format(loss/counter, top1/counter, stepsize/telapsed));
                 sys.stdout.flush();
 
             if self.lr_step == 'iteration': self.__scheduler__.step()
@@ -131,7 +135,7 @@ class ModelTrainer(object):
 
 
     ## ===== ===== ===== ===== ===== ===== ===== =====
-    ## Evaluate from list 根据测试列表进行评估
+    ## Evaluate from list 根据给定的测试列表进行评估, 可用于训练过程中的过拟合监测或最终的测试评估
     ## ===== ===== ===== ===== ===== ===== ===== =====
 
     def evaluateFromList(self, test_list, test_path, nDataLoaderThread, distributed, print_interval=100, num_eval=10, **kwargs):
@@ -148,7 +152,7 @@ class ModelTrainer(object):
         feats       = {}
         tstart      = time.time()
 
-        ## Read all lines
+        ## Read all lines 读取测试列表
         with open(test_list) as f:
             lines = f.readlines()
 
@@ -205,7 +209,7 @@ class ModelTrainer(object):
                 for feats_batch in feats_all[1:]:
                     feats.update(feats_batch)
 
-            ## Read files and compute all scores
+            ## Read files and compute all scores 打分
             for idx, line in enumerate(lines):
 
                 data = line.split();
@@ -216,10 +220,12 @@ class ModelTrainer(object):
                 ref_feat = feats[data[1]].cuda()
                 com_feat = feats[data[2]].cuda()
 
+                # 对embdding进行L2 normalization
                 if self.__model__.module.__L__.test_normalize:
                     ref_feat = F.normalize(ref_feat, p=2, dim=1)
                     com_feat = F.normalize(com_feat, p=2, dim=1)
 
+                # L2距离打分
                 dist = F.pairwise_distance(ref_feat.unsqueeze(-1), com_feat.unsqueeze(-1).transpose(0,2)).detach().cpu().numpy();
 
                 score = -1 * numpy.mean(dist);

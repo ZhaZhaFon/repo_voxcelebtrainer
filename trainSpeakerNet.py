@@ -2,7 +2,7 @@
 #-*- coding: utf-8 -*-
 
 # original codebase: https://github.com/clovaai/voxceleb_trainer
-# edited and distributed by Zifeng Zhao @ Peking University
+# edited and re-distributed by Zifeng Zhao @ Peking University
 # 2022.03
 
 import sys, time, os, argparse, socket
@@ -15,7 +15,7 @@ import zipfile
 import warnings
 import datetime
 import SpeakerNet
-from tuneThreshold import *
+import tuneThreshold
 import DatasetLoader
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -145,7 +145,7 @@ def main_worker(gpu, ngpus_per_node, args):
         torch.cuda.set_device(args.gpu)
         model.cuda(args.gpu)
 
-        model = torch.nn.parallel.DistributedDataParallel(s, device_ids=[args.gpu], find_unused_parameters=True)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
 
         print('Loaded the model on GPU {:d}'.format(args.gpu))
 
@@ -215,10 +215,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
         if args.gpu == 0:
 
-            result = tuneThresholdfromScore(sc, lab, [1, 0.1]);
+            result = tuneThreshold.tuneThresholdfromScore(sc, lab, [1, 0.1]);
 
-            fnrs, fprs, thresholds = ComputeErrorRates(sc, lab)
-            mindcf, threshold = ComputeMinDcf(fnrs, fprs, thresholds, args.dcf_p_target, args.dcf_c_miss, args.dcf_c_fa)
+            fnrs, fprs, thresholds = tuneThreshold.ComputeErrorRates(sc, lab)
+            mindcf, threshold = tuneThreshold.ComputeMinDcf(fnrs, fprs, thresholds, args.dcf_p_target, args.dcf_c_miss, args.dcf_c_fa)
 
             print('\n',time.strftime("%Y-%m-%d %H:%M:%S"), "VEER {:2.4f}".format(result[1]), "MinDCF {:2.5f}".format(mindcf));
 
@@ -259,32 +259,35 @@ def main_worker(gpu, ngpus_per_node, args):
 
         clr = [x['lr'] for x in trainer.__optimizer__.param_groups]
 
-        print(f'# epoch {it} - train...')
+        print(f'\n# epoch {it} - train...')
         #loss, traineer = trainer.train_network(train_loader, verbose=(args.gpu == 0));
         loss, traineer = trainer.train_network(train_loader, verbose=True);
 
         # if args.gpu == 0:
         if True:
-            print('\n',time.strftime("%Y-%m-%d %H:%M:%S"), "Epoch {:d}, TEER/TAcc {:2.2f}, TLOSS {:f}, LR {:f}".format(it, traineer, loss, max(clr)));
-            scorefile.write("Epoch {:d}, TEER/TAcc {:2.2f}, TLOSS {:f}, LR {:f} \n".format(it, traineer, loss, max(clr)));
+            print('\n',time.strftime("%Y-%m-%d %H:%M:%S"), "Epoch {:d}, TrainEER/TrainAcc {:2.2f}, TrainLOSS {:f}, LR {:f}".format(it, traineer, loss, max(clr)));
+            scorefile.write("Epoch {:d}, TrainEER/TrainAcc {:2.2f}, TrainLOSS {:f}, LR {:f} \n".format(it, traineer, loss, max(clr)));
 
         if it % args.test_interval == 0:
 
+            
             print(f'# epoch {it} - test_interval...')
+            # 返回测试列表上所有测试对的打分结果sc和对应标签lab
             sc, lab, _ = trainer.evaluateFromList(**vars(args))
 
             #if args.gpu == 0:
             if True:
                 
-                result = tuneThresholdfromScore(sc, lab, [1, 0.1]);
+                # 卡阈值 返回[thr, EER, FAR, FRR]
+                result = tuneThreshold.tuneThresholdfromScore(sc, lab, [1, 0.1]);
 
-                fnrs, fprs, thresholds = ComputeErrorRates(sc, lab)
-                mindcf, threshold = ComputeMinDcf(fnrs, fprs, thresholds, args.dcf_p_target, args.dcf_c_miss, args.dcf_c_fa)
+                fnrs, fprs, thresholds = tuneThreshold.ComputeErrorRates(sc, lab)
+                mindcf, threshold = tuneThreshold.ComputeMinDcf(fnrs, fprs, thresholds, args.dcf_p_target, args.dcf_c_miss, args.dcf_c_fa)
 
                 eers.append(result[1])
 
-                print('\n',time.strftime("%Y-%m-%d %H:%M:%S"), "Epoch {:d}, VEER {:2.4f}, MinDCF {:2.5f}".format(it, result[1], mindcf));
-                scorefile.write("Epoch {:d}, VEER {:2.4f}, MinDCF {:2.5f}\n".format(it, result[1], mindcf));
+                print('\n',time.strftime("%Y-%m-%d %H:%M:%S"), "Epoch {:d}, ValidEER {:2.4f}, MinDCF {:2.5f}".format(it, result[1], mindcf));
+                scorefile.write("Epoch {:d}, ValidEER {:2.4f}, MinDCF {:2.5f}\n".format(it, result[1], mindcf));
 
                 trainer.saveParameters(args.model_save_path+"/model%09d.model"%it);
 

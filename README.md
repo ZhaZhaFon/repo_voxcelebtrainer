@@ -1,5 +1,5 @@
 
-# voxcelebtrainer_repo
+# repo_voxcelebtrainer
 
 This repository contains the framework for training speaker recognition models described in the paper '_In defence of metric learning for speaker recognition_'.
 
@@ -7,6 +7,7 @@ This repository contains the framework for training speaker recognition models d
 该代码出自论文[1], 用于实验不同的深度度量学习方法训练xvector用于说话人识别的效果. 在[原项目](https://github.com/clovaai/voxceleb_trainer)的基础上, 做了一些配置方便使用, 并加入了一些注释.
 
 ### Dependencies 环境配置
+
 运行以下命令一键配置环境
 ```
 pip install -r requirements.txt
@@ -17,11 +18,143 @@ pip install -r requirements.txt
 ```
 voxceleb_trainer/ 
     models/ 各网络结构
+      ResNetSE34L.py
     loss/ 各损失函数
+      softmax.py 
     DatasetLoader.py 数据集IO
     SpeakerNet.py 网络结构
     trainSpeakerNet.py 训练主程序
+    tuneThreshold.py 卡阈值及指标计算相关
 ```
+
+### 主要实现逻辑
+
+* SpeakerNet.ModelTrainer单epoch训练逻辑
+trainSpeakerNet.py主程序中对象化SpeakerNet.ModelTrainer, 并通过其train_network方法进行单epoch训练. 对每批数据, 通过SpeakerNet.SpeakerNet模型的forward方法进行前向传播
+```
+nloss, prec1 = self.__model__(data, label)
+```
+```
+def train_network(self, loader, verbose):
+
+        self.__model__.train();
+
+        stepsize = loader.batch_size;
+
+        counter = 0;
+        index   = 0;
+        loss    = 0;
+        top1    = 0;    # EER or accuracy
+
+        tstart = time.time()
+        
+        for data, data_label in loader:
+
+            data    = data.transpose(1,0)
+
+            self.__model__.zero_grad();
+
+            label   = torch.LongTensor(data_label).cuda()
+
+            if self.mixedprec:
+                with autocast():
+                    nloss, prec1 = self.__model__(data, label)
+                self.scaler.scale(nloss).backward();
+                self.scaler.step(self.__optimizer__);
+                self.scaler.update();       
+            else:
+                # 
+                nloss, prec1 = self.__model__(data, label)
+                nloss.backward();
+                self.__optimizer__.step();
+
+
+            loss    += nloss.detach().cpu().item();
+            top1    += prec1.detach().cpu().item();
+            counter += 1;
+            index   += stepsize;
+
+            telapsed = time.time() - tstart
+            tstart = time.time()
+
+            if verbose:
+                sys.stdout.write("\rProcessing {:d} of {:d}:".format(index, loader.__len__()*loader.batch_size));
+                sys.stdout.write("Loss {:f} TrainEER/TrainAcc {:2.3f}% - {:.2f} Hz ".format(loss/counter, top1/counter, stepsize/telapsed));
+                sys.stdout.flush();
+
+            if self.lr_step == 'iteration': self.__scheduler__.step()
+
+        if self.lr_step == 'epoch': self.__scheduler__.step()
+        
+        return (loss/counter, top1/counter);
+```
+
+* SpeakerNet.SpeakerNet模型
+SpeakerNet.SpeakerNet模型包括SpeakerEncoder子模型和LossFunction子模型, 分别实现Embedding推理和Loss计算
+```
+class SpeakerNet(nn.Module):
+
+    def __init__(self, model, optimizer, trainfunc, nPerSpeaker, **kwargs):
+        super(SpeakerNet, self).__init__();
+
+        # SpeakerEncoder模型
+        SpeakerNetModel = importlib.import_module('models.'+model).__getattribute__('MainModel')
+        self.__S__ = SpeakerNetModel(**kwargs);
+
+        # Loss函数
+        LossFunction = importlib.import_module('loss.'+trainfunc).__getattribute__('LossFunction')
+        self.__L__ = LossFunction(**kwargs);
+
+        self.nPerSpeaker = nPerSpeaker
+
+    def forward(self, data, label=None):
+
+        # SpeakerEncoder子模型前向传播 得到SpeakerEmbedding
+        data    = data.reshape(-1,data.size()[-1]).cuda() 
+        outp    = self.__S__.forward(data)
+
+        if label == None:
+            return outp
+
+        else:
+
+            outp    = outp.reshape(self.nPerSpeaker,-1,outp.size()[-1]).transpose(1,0).squeeze(1)
+            
+            # SpeakerEmbedding送给Loss子模型计算loss和precision
+            nloss, prec1 = self.__L__.forward(outp,label)
+
+            return nloss, prec1
+```
+
+* SpeakerEncoder子模型
+
+网络以类形式定义. forward()方法中实现输入到SpeakerEmbedding的前向传播. 略
+
+* Loss子模型
+
+以softmax.py为例: Loss以类似网络的方式定义一个类来实现, 以forward作为接口, 接收SpeakerEncoder网络的输出(Speaker Embedding), 经过全连接FC规整后输出到nOut个分类头, 多分类预测结果和多分类标签送入多分类交叉熵torch.nn.CrossEntropyLoss计算分类损失(实现上与先进行LogSoftmax规整再送负对数似然NLLLoss计算多分类损失等价). 最后loss和precision返回给SpeakerEncoder子模型.
+```
+class LossFunction(nn.Module):
+	def __init__(self, nOut, nClasses, **kwargs):
+	    super(LossFunction, self).__init__()
+
+	    self.test_normalize = True
+	    
+	    self.criterion  = torch.nn.CrossEntropyLoss()
+	    self.fc 		= nn.Linear(nOut,nClasses)
+
+	    print('Initialised Softmax Loss')
+
+	def forward(self, x, label=None):
+
+		x 		= self.fc(x)
+		nloss   = self.criterion(x, label)
+		prec1	= accuracy(x.detach(), label.detach(), topk=(1,))[0]
+
+		return nloss, prec1
+```
+
+* 
 
 ### TODO LIST
 * 通过yaml配置参数
