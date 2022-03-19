@@ -31,7 +31,7 @@ voxceleb_trainer/
 
 * SpeakerNet.ModelTrainer单epoch训练逻辑  
 
-trainSpeakerNet.py主程序中对象化SpeakerNet.ModelTrainer, 并通过其train_network方法进行单epoch训练. 对每批数据, 通过SpeakerNet.SpeakerNet模型的forward方法进行前向传播
+trainSpeakerNet.py主程序中对象化class SpeakerNet.ModelTrainer, 并通过其train_network()方法进行单epoch训练. 对每批数据, 通过class SpeakerNet.SpeakerNet模型的forward()方法进行前向传播
 ```
 def train_network(self, loader, verbose):
 
@@ -88,7 +88,7 @@ def train_network(self, loader, verbose):
         return (loss/counter, top1/counter);
 ```
 
-* SpeakerNet.SpeakerNet模型  
+* class SpeakerNet.SpeakerNet模型  
 
 SpeakerNet.SpeakerNet模型包括SpeakerEncoder子模型和LossFunction子模型, 分别实现Embedding推理和Loss计算
 ```
@@ -130,7 +130,7 @@ class SpeakerNet(nn.Module):
 网络以类形式定义. forward()方法中实现输入到SpeakerEmbedding的前向传播. 略
 
 * Loss子模型  
-以softmax.py为例: Loss以类似网络的方式定义一个类来实现, 以forward作为接口, 接收SpeakerEncoder网络的输出(Speaker Embedding), 经过全连接FC规整后输出到nOut个分类头, 多分类预测结果和多分类标签送入多分类交叉熵torch.nn.CrossEntropyLoss计算分类损失(实现上与先进行LogSoftmax规整再送负对数似然NLLLoss计算多分类损失等价). 最后loss和precision返回给SpeakerEncoder子模型.
+以softmax.py为例: Loss以类似网络的方式定义一个类class LossFunction来实现, 以forward()作为接口, 接收SpeakerEncoder网络的输出(Speaker Embedding), 经过全连接FC规整后输出到nOut个分类头, 多分类预测结果和多分类标签送入多分类交叉熵torch.nn.CrossEntropyLoss计算分类损失(实现上与先进行LogSoftmax规整再送负对数似然NLLLoss计算多分类损失等价). 最后loss和precision返回给SpeakerEncoder子模型.
 ```
 class LossFunction(nn.Module):
 	def __init__(self, nOut, nClasses, **kwargs):

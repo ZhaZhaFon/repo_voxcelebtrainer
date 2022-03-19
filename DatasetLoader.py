@@ -16,6 +16,7 @@ from scipy.io import wavfile
 from torch.utils.data import Dataset, DataLoader
 import torch.distributed as dist
 
+# 将num削成divisor的倍数
 def round_down(num, divisor):
     return num - (num%divisor)
 
@@ -146,16 +147,18 @@ class train_dataset_loader(Dataset):
             
             audio = loadWAV(self.data_list[index], self.max_frames, evalmode=False)
             
+            # 数据增强
             if self.augment:
+                # 随机选择一种增强方式
                 augtype = random.randint(0,4)
                 if augtype == 1:
-                    audio   = self.augment_wav.reverberate(audio)
+                    audio   = self.augment_wav.reverberate(audio) # 混响
                 elif augtype == 2:
-                    audio   = self.augment_wav.additive_noise('music',audio)
+                    audio   = self.augment_wav.additive_noise('music',audio) # MUSAN的music噪声
                 elif augtype == 3:
-                    audio   = self.augment_wav.additive_noise('speech',audio)
+                    audio   = self.augment_wav.additive_noise('speech',audio) # MUSAN的speech噪声
                 elif augtype == 4:
-                    audio   = self.augment_wav.additive_noise('noise',audio)
+                    audio   = self.augment_wav.additive_noise('noise',audio) # MUSAN的noise噪声
                     
             feat.append(audio);
 
@@ -198,38 +201,41 @@ class train_dataset_sampler(torch.utils.data.Sampler):
 
         g = torch.Generator()
         g.manual_seed(self.seed + self.epoch)
-        indices = torch.randperm(len(self.data_label), generator=g).tolist()
+        indices = torch.randperm(len(self.data_label), generator=g).tolist() # 对数据进行随机排列(洗牌)
 
         data_dict = {}
 
         # Sort into dictionary of file indices for each ID
-        for index in indices:
-            speaker_label = self.data_label[index]
+        # 建立以说话人数据字典 key是SpeakerID value是该说话人的样本列表
+        for index in indices: # 遍历数据
+            speaker_label = self.data_label[index] # 获取该样本的SpeakerID
             if not (speaker_label in data_dict):
                 data_dict[speaker_label] = [];
-            data_dict[speaker_label].append(index);
+            data_dict[speaker_label].append(index); # 列表增添
 
 
         ## Group file indices for each class
+        # 获取SpeakerID列表
         dictkeys = list(data_dict.keys());
         dictkeys.sort()
 
+        # lambda 将lst列表按sz为步长进行分段xw
         lol = lambda lst, sz: [lst[i:i+sz] for i in range(0, len(lst), sz)]
 
         flattened_list = []
         flattened_label = []
         
         for findex, key in enumerate(dictkeys):
-            data    = data_dict[key]
-            numSeg  = round_down(min(len(data),self.max_seg_per_spk),self.nPerSpeaker)
+            data    = data_dict[key] # data是说话人key的样本列表
+            numSeg  = round_down(min(len(data),self.max_seg_per_spk),self.nPerSpeaker) # 将data削成nPerSpeaker的整倍数 多余将被lol抛弃
             
-            rp      = lol(numpy.arange(numSeg),self.nPerSpeaker)
-            flattened_label.extend([findex] * (len(rp)))
+            rp      = lol(numpy.arange(numSeg),self.nPerSpeaker) # 以nPerSpeaker为块对numpy.arange(numSeg)进行分段
+            flattened_label.extend([findex] * (len(rp))) # 标签
             for indices in rp:
-                flattened_list.append([data[i] for i in indices])
+                flattened_list.append([data[i] for i in indices]) # 样本
 
         ## Mix data in random order
-        mixid           = torch.randperm(len(flattened_label), generator=g).tolist()
+        mixid           = torch.randperm(len(flattened_label), generator=g).tolist() # 对标签洗牌
         mixlabel        = []
         mixmap          = []
 
