@@ -1,0 +1,19 @@
+
+# 模型相关
+model: ResNetSE34L
+encoder_type: SAP
+
+# 数据相关
+log_input: True
+batch_size: 128
+nClasses: 1211 # TODO
+max_epoch: 300
+
+# 路径
+train_list: /home/zzf/dataset/vox1/train_list.txt # train_list绝对路径 # TODO
+test_list: /home/zzf/dataset/vox1/veri_test.txt # test_list绝对路径 # TODO
+train_path: /home/zzf/dataset/vox1/wav # 训练集绝对路径 # TODO
+test_path: /home/zzf/dataset/vox1/wav_test # 测试集绝对路径 # TODO
+
+# 其他
+tensorboard: True

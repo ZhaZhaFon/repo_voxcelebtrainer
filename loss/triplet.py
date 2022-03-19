@@ -75,7 +75,8 @@ class LossFunction(nn.Module):
             if self.hard_rank < 0:
 
                 ## Semi-hard negative mining
-                # 负样本挖掘方案1 semi-hard
+                # 负样本挖掘方案1 semi-hard[1]
+                # [1] F. Schoff, et al. FaceNet: A Unified Embedding for Face Recognition and Clustering. IEEE Conf. on CVPR 2015
                 
                 # easy case (L2为相似度)
                 # d(a,p) + margin < d(a,n)              Eq 1

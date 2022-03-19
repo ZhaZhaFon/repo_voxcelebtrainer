@@ -20,6 +20,8 @@ import DatasetLoader
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
+from torch.utils.tensorboard import SummaryWriter
+
 ## ===== ===== ===== ===== ===== ===== ===== =====
 ## Parse arguments 运行参数解析
 ## ===== ===== ===== ===== ===== ===== ===== =====
@@ -90,7 +92,8 @@ parser.add_argument('--distributed',    dest='distributed', action='store_true',
 parser.add_argument('--mixedprec',      dest='mixedprec',   action='store_true', help='Enable mixed precision training')
 
 # 新增参数
-parser.add_argument("--gpu",            type=str,    default="0",    required=True, help="GPU available")
+parser.add_argument("--gpu",            type=str,   default="0",    required=True, help="available GPU")
+parser.add_argument("--tensorboard",    type=bool,  default=False,  help="write logs with tensorboard")
 
 print('')
 print('# 解析parser运行参数')
@@ -264,6 +267,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
         with open(args.result_save_path + '/run%s.cmd'%strtime, 'w') as f:
             f.write('%s'%args)
+            
+    # tensorboard
+    if args.tensorboard:
+        tb_writer = SummaryWriter(os.path.join(args.result_save_path, 'tb_logs'))
 
     ## Core training script
     print('')
@@ -282,9 +289,13 @@ def main_worker(gpu, ngpus_per_node, args):
         if True:
             print('\n',time.strftime("%Y-%m-%d %H:%M:%S"), "Epoch {:d}, TrainEER/TrainAcc {:2.2f}, TrainLOSS {:f}, LR {:f}".format(it, traineer, loss, max(clr)));
             scorefile.write("Epoch {:d}, TrainEER/TrainAcc {:2.2f}, TrainLOSS {:f}, LR {:f} \n".format(it, traineer, loss, max(clr)));
+            
+            if args.tensorboard:
+                tb_writer.add_scalar('train/loss', loss, it)
+                tb_writer.add_scalar('train/EER_or_Acc', traineer, it)
+                tb_writer.add_scalar('train/learning_rate', max(clr), it)
 
         if it % args.test_interval == 0:
-
             
             print(f'\n# epoch {it} - test_interval...')
             # 返回测试列表上所有测试对的打分结果sc和对应标签lab
@@ -310,6 +321,10 @@ def main_worker(gpu, ngpus_per_node, args):
                     eerfile.write('{:2.4f}'.format(result[1]))
 
                 scorefile.flush()
+                
+                if args.tensorboard:
+                    tb_writer.add_scalar('val/EER', result[1], it)
+                    tb_writer.add_scalar('val/MinDCF', mindcf, it)
 
         #if ("nsml" in sys.modules) and args.gpu == 0:
         if ("nsml" in sys.modules):
