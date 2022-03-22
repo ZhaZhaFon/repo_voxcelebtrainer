@@ -24,11 +24,14 @@ class LossFunction(nn.Module):
 
         assert x.size()[1] >= 2
         
-        out_anchor      = torch.mean(x[:,1:,:],1)
-        out_positive    = x[:,0,:]
+        out_anchor      = torch.mean(x[:,1:,:],1) # support set -> prototype
+        out_positive    = x[:,0,:] # query set
         stepsize        = out_anchor.size()[0]
 
-        output  = -1 * (F.pairwise_distance(out_positive.unsqueeze(-1),out_anchor.unsqueeze(-1).transpose(0,2))**2)
+        # (batch_size, embeding_dimension)
+        #output  = -1 * (F.pairwise_distance(out_positive.unsqueeze(-1),out_anchor.unsqueeze(-1).transpose(0,2))**2)
+        # (batch_size, speaker_num_in_the_batch)
+        output = -1 * (F.pairwise_distance(out_anchor.unsqueeze(1), out_positive.unsqueeze(0))**2)
         label   = torch.from_numpy(numpy.asarray(range(0,stepsize))).cuda()
         nloss   = self.criterion(output, label)
         prec1   = accuracy(output.detach(), label.detach(), topk=(1,))[0]

@@ -194,17 +194,17 @@ def main_worker(gpu, ngpus_per_node, args):
     modelfiles.sort()
 
     if(args.initial_model != ""):
-        print("      从给定的{}加载模型参数".format(args.initial_model));
+        print("      # 从给定的{}加载模型参数".format(args.initial_model));
         trainer.loadParameters(args.initial_model);
         #print("Model {} loaded!".format(args.initial_model));
     elif len(modelfiles) >= 1:
         trainer.loadParameters(modelfiles[-1]);
-        print("      从{}加载断点".format(modelfiles[-1]), end='');
+        print("      # 从{}加载断点".format(modelfiles[-1]));
         #print("Model {} loaded from previous state!".format(modelfiles[-1]));
         it = int(os.path.splitext(os.path.basename(modelfiles[-1]))[0][5:]) + 1
-        print(" 从epoch{}继续".format(it))
+        print("      # 从epoch{}继续".format(it))
     else:
-        print("      从0起训");
+        print("      # 从0起训");
 
     for ii in range(1,it):
         trainer.__scheduler__.step()

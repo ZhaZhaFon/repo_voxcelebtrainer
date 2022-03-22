@@ -156,15 +156,15 @@ class LossFunction(nn.Module):
 
 ### 改动
 
-* 加入Makefile方便运行
+* 加入了Makefile方便运行
 * 可以指定GPU进行单卡训练
 * 设定了几个基本配置的yaml
 * 修正了triplet.py
 * 加入了tensorboard打log
+* 修正了proto.py
 
 ### TODO LIST
-* proto系列
-* GE2E
+* angleproto
 
 ### Data preparation
 

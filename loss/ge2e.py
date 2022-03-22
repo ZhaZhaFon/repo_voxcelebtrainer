@@ -31,7 +31,7 @@ class LossFunction(nn.Module):
         stepsize = x.size()[0]
 
         cos_sim_matrix = []
-
+        
         for ii in range(0,gsize): 
             idx = [*range(0,gsize)]
             idx.remove(ii)
