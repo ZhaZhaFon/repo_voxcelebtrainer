@@ -20,13 +20,6 @@
 * VGGVox
 * ResNetSE34V2
 
-### Dependencies 环境配置
-
-运行以下命令一键配置环境
-```
-pip install -r requirements.txt
-```
-
 ### 文件组织
 
 ```
@@ -180,6 +173,12 @@ class LossFunction(nn.Module):
 ### README
 
 This repository contains the framework for training speaker recognition models described in the paper '_In defence of metric learning for speaker recognition_'.
+
+### Dependencies
+
+```
+pip install -r requirements.txt
+```
 
 ### Data preparation
 
