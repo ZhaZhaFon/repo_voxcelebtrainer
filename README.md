@@ -3,7 +3,7 @@
 
 [原始仓库链接](https://github.com/clovaai/voxceleb_trainer), 做了一些修改方便使用, 粗体为已跑
 
-* 基于rvector的度量学习实验代码
+* 基于rvector的说话人识别深度度量学习实验代码
 * 支持**ResNetSE34**/VGGVox等模型
 * 支持**Softmax**/**AM-Softmax**/**AAM-Softmax**/**Triplet**/**Prototypical**/**AngularPrototypical**/**GE2E**等loss及训练方法
 * 支持**VoxCeleb1**/VoxCeleb2
