@@ -1,8 +1,6 @@
 
 # repo_voxcelebtrainer
 
-This repository contains the framework for training speaker recognition models described in the paper '_In defence of metric learning for speaker recognition_'.
-
 [原始仓库链接](https://github.com/clovaai/voxceleb_trainer), 做了一些修改方便使用, 粗体为已跑
 
 * 基于rvector的度量学习实验代码
@@ -175,6 +173,13 @@ class LossFunction(nn.Module):
 
 		return nloss, prec1
 ```
+
+---
+---  
+
+### README
+
+This repository contains the framework for training speaker recognition models described in the paper '_In defence of metric learning for speaker recognition_'.
 
 ### Data preparation
 
