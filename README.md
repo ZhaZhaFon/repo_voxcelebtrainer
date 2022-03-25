@@ -10,6 +10,18 @@ This repository contains the framework for training speaker recognition models d
 * 支持<u>Softmax</u>/<u>AM-Softmax</u>/<u>AAM-Softmax</u>/<u>Triplet</u>/<u><u>Prototypical</u>/<u>AngularPrototypical</u>/GE2E</u>等loss及训练方法
 * 支持<u>VoxCeleb1</u>/VoxCeleb2
 
+### 改动
+
+* 加入了Makefile方便运行
+* 设定了几个基本配置的yaml
+* 修正了triplet.py
+* 加入了tensorboard打log
+* 修正了proto.py
+
+### TODO LIST
+* VGGVox
+* ResNetSE34V2
+
 ### Dependencies 环境配置
 
 运行以下命令一键配置环境
@@ -163,18 +175,6 @@ class LossFunction(nn.Module):
 
 		return nloss, prec1
 ```
-
-### 改动
-
-* 加入了Makefile方便运行
-* 设定了几个基本配置的yaml
-* 修正了triplet.py
-* 加入了tensorboard打log
-* 修正了proto.py
-
-### TODO LIST
-* VGGVox
-* ResNetSE34V2
 
 ### Data preparation
 
