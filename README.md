@@ -3,7 +3,12 @@
 
 This repository contains the framework for training speaker recognition models described in the paper '_In defence of metric learning for speaker recognition_'.
 
-本项目代码出自论文[1][2], 用于实验不同的深度度量学习方法训练rvector用于说话人识别的效果. 在[原项目](https://github.com/clovaai/voxceleb_trainer)的基础上, 做了一些配置方便使用, 并加入了一些注释.
+[原始仓库链接](https://github.com/clovaai/voxceleb_trainer), 做了一些修改方便使用, 下划线为已跑
+
+* 基于rvector的度量学习实验代码
+* 支持<u>ResNetSE34</u>/VGGVox等模型
+* 支持<u>Softmax</u>/<u>AM-Softmax</u>/<u>AAM-Softmax</u>/<u>Triplet</u>/<u><u>Prototypical</u>/<u>AngularPrototypical</u>/GE2E</u>等loss及训练方法
+* 支持<u>VoxCeleb1</u>/VoxCeleb2
 
 ### Dependencies 环境配置
 
@@ -16,15 +21,18 @@ pip install -r requirements.txt
 
 ```
 voxceleb_trainer/ 
-    models/ 各网络结构
+    models/ 各网络结构实现
       ResNetSE34L.py
-    loss/ 各损失函数
+      ResNetSE34V2.py
+      VGGVox.py
+    loss/ 各损失函数及采样器实现
       softmax.py 
       amsoftmax.py
       aamsoftmax.py
       triplet.py
       ge2e.py
       proto.py
+      angleproto.py
     DatasetLoader.py 数据IO
     SpeakerNet.py SpeakerNet类
     trainSpeakerNet.py 训练主程序
@@ -165,7 +173,8 @@ class LossFunction(nn.Module):
 * 修正了proto.py
 
 ### TODO LIST
-* more models
+* VGGVox
+* ResNetSE34V2
 
 ### Data preparation
 
